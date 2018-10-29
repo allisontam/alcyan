@@ -32,7 +32,7 @@ model.save_weights('soniaCnn.h5')
 
 
 # adapted from https://keras.io/layers/writing-your-own-keras-layers/
-class SoniaLayer(Layer):
+class SoniaLayer_old(Layer):
 
     def __init__(self, output_dim, **kwargs):
         self.output_dim = output_dim
