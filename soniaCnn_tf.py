@@ -16,16 +16,12 @@ class SoniaLayer(keras.layers.Layer):
                                            self.output_dim])
 
     def call(self, input):	# TODO my understanding is that this is the feed-forward part, so this is what a finished net would do to the input 
-        print('\n\nKERNEL SHAPE:', self.kernel.shape)
-        print('INPUT SHAPE:', tf.squeeze(input).shape, '\n\n')
-#         print('INPUT SHAPE:', tf.stack([tf.squeeze(input) for __ in range(self.output_dim)], axis=1).shape, '\n\n')
-        A = self.kernel - tf.stack([tf.squeeze(input) for __ in range(self.output_dim)], axis=1)
+        A = self.kernel - tf.stack([input for __ in range(self.output_dim)], axis=-1)
         B = tf.square(A)
-        C = tf.reduce_sum(B, axis=0)	# sum across all i, i.e. across the input dimension. WHY is that dimension 0 and not dimension 1???
+        C = tf.reduce_sum(B, axis=1)	# sum across all i, i.e. across the input dimension. WHY is that dimension 0 and not dimension 1???
         D = tf.sqrt(C)
-        print('INPUT ENTRY TYPE:', type(int(input.shape[1])))
-        return tf.reshape(tf.nn.tanh(D), [1, self.output_dim])	# TODO this ranges from [-1, 1] I think but in the paper it says it should be [0, 1] (page 76). What's up?. Also, tf.keras.layers.Layer doesn't automatically have an activation attribute (or support for the kwarg). Can I just stick it in so that this activation can be applied in a more tf-ish way, or should I leave it hardcoded? Will it be a part of the training this way?
-
+#         return tf.reshape(tf.nn.tanh(D), [1, self.output_dim])	# TODO this ranges from [-1, 1] I think but in the paper it says it should be [0, 1] (page 76). What's up?. Also, tf.keras.layers.Layer doesn't automatically have an activation attribute (or support for the kwarg). Can I just stick it in so that this activation can be applied in a more tf-ish way, or should I leave it hardcoded? Will it be a part of the training this way?
+        return tf.nn.tanh(D)
 
 num_classes = 10 
 
@@ -46,7 +42,6 @@ model.add(keras.layers.Flatten())
 model.add(SoniaLayer(20))
 model.add(keras.layers.Dense(num_classes)) # , activation='softmax')
 model.add(keras.layers.Activation('softmax'))
-
 
 model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
 x_train = x_train.astype('float32')
