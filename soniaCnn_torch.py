@@ -27,13 +27,6 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
         self.input_features = input_features
         self.output_features = output_features
 
-        # nn.Parameter is a special kind of Tensor, that will get
-        # automatically registered as Module's parameter once it's assigned
-        # as an attribute. Parameters and buffers need to be registered, or
-        # they won't appear in .parameters() (doesn't apply to buffers), and
-        # won't be converted when e.g. .cuda() is called. You can use
-        # .register_buffer() to register buffers.
-        # nn.Parameters require gradients by default.
         self.weight = nn.Parameter(torch.Tensor(output_features, input_features))
 
         # Not a very smart way to initialize weights
@@ -43,7 +36,7 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
-        return SoniaFunc.apply(input, self.weight, self.bias)
+        return SoniaFunc.apply(input, self.weight, self.output_features, self.bias)
 
     def extra_repr(self):
         # (Optional)Set the extra information about this module. You can test
@@ -58,10 +51,15 @@ class SoniaFunc(torch.autograd.Function):
         super(Som, self).__init__()
 
     @staticmethod
-    def forward(ctx, input, weight, bias=None):
+    def forward(ctx, input, weight, output_features, bias=None):
         ctx.save_for_backward(input, weight, bias)
-        
-    
+        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis  
+        A:pow(2)        
+        B = torch.sum(A, 1)   
+        B:sqrt()
+        B:tanh()
+        return B
+ 
     @staticmethod
     def backward(ctx, grad_output):
         input, weight, bias = ctx.saved_tensors
