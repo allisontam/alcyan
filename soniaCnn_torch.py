@@ -33,18 +33,16 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
 
         # Not a very smart way to initialize weights
         self.weight.data.uniform_(-0.1, 0.1)
-        if bias is not None:
-            self.bias.data.uniform_(-0.1, 0.1)
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
-        return SoniaFunc.apply(input, self.weight, self.output_features, self.bias)
+        return SoniaFunc.apply(input, self.weight, self.output_features)
 
     def extra_repr(self):
         # (Optional)Set the extra information about this module. You can test
         # it by printing an object of this class.
-        return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.bias is not None
+        return 'in_features={}, out_features={}'.format(
+            self.in_features, self.out_features
         )
 
 # SOM LAYER
@@ -53,11 +51,11 @@ class SoniaFunc(torch.autograd.Function):
         super(Som, self).__init__()
 
     @staticmethod
-    def forward(ctx, input, weight, output_features, bias=None):
-        ctx.save_for_backward(input, weight, bias)
-        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis  
-        A:pow(2)        
-        B = torch.sum(A, 1)   
+    def forward(ctx, input, weight, output_features):
+        ctx.save_for_backward(input, weight)
+        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
+        A:pow(2)
+        B = torch.sum(A, 1)
         B:sqrt()
         B:tanh()
         return B
@@ -66,6 +64,12 @@ class SoniaFunc(torch.autograd.Function):
     def backward(ctx, grad_output):
         input, weight, bias = ctx.saved_tensors
         return grad_output
+        # input, weight = ctx.saved_tensors
+        # A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
+        # A:pow(2)
+        # B = torch.sum(A, 1)
+        # print B.shape
+        # winner, c = B.min(0)
 
 ### SECTION 2: BUILD NET
 class SoniaNet(nn.Module):
@@ -84,7 +88,7 @@ class SoniaNet(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-cnn = Cnn()
+cnn = SoniaNet()
 
 ### SECTION 3: TRAIN NET
 import torch.optim as optim
