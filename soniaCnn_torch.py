@@ -71,19 +71,19 @@ class SoniaFunc(torch.autograd.Function):
         # input, weight = ctx.saved_tensors
         # return grad_output, None
         input, weight, output_features = ctx.saved_tensors
-        grad_input = weight
+        grad_input = grad_output.mm(weight)
+        # print('grad_output shape', grad_output.shape, 'weight shape', weight.shape)
         grad_weight = torch.zeros(weight.shape)
 
         A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
         A:pow(2)
         B = torch.sum(A, 1)
-        print('weight shape', weight.shape, 'B.shape', B.shape) # expect to see a 20x250, 20x1 tensor
+        # print('weight shape', weight.shape, 'B.shape', B.shape) # expect to see a 20x250, 20x1 tensor
         winner, c = B.min(0)
         if winner < 0.5: # TODO: make this an adjustable paramter sl later
             weight[c, :] = winner
-        else:
             # TODO: generate a new dude but we're actually just going to do nothing for now
-            print('not really adding new block')
+            # print('not really adding new block')
         return grad_input, grad_weight, None
 
 
@@ -123,8 +123,8 @@ for epoch in range(2):  # loop over the dataset multiple times
 
         # forward + backward + optimize
         outputs = cnn(inputs)
-        print('OUTPUT SHAPE:', outputs)
-        print('LABEL SHAPE:', labels)
+        # print('OUTPUT SHAPE:', outputs)
+        # print('LABEL SHAPE:', labels)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
