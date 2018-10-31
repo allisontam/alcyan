@@ -1,3 +1,6 @@
+### SECTION 0: HYPERPARAMETERS
+num_epochs = 1
+
 ### SECTION 1: LOAD CIFAR
 import torch
 import torch.nn as nn
@@ -27,7 +30,7 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
     def __init__(self, input_features, output_features):
         super(SoniaLayer, self).__init__()
         self.input_features = input_features
-        self.output_features = output_features
+        self.output_features = torch.ones(1, dtype=torch.int, requires_grad=False)*output_features
         # might need to make output_features a tensor with param requires_grad=False
         # this^ is the case (i think) bc forward requires all its input params to be a tensor
         # this might switch when we add hidden layers but we worry about it later
@@ -55,35 +58,37 @@ class SoniaFunc(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input, weight, output_features):
-        ctx.save_for_backward(input, 
-                              weight, 
-                              torch.ones(1, dtype=torch.int, requires_grad=False) * output_features)
-        A = weight - torch.cat([input for __ in range(int(output_features))], 0)	# TODO check axis
+        ctx.save_for_backward(input,
+                              weight,
+                              output_features)
+        A = weight - torch.cat([input for __ in range(int(output_features))], 0) # TODO: check axis
         A:pow(2)
         B = torch.sum(A, 1)
-        B:sqrt()
+        # taking this line out to make the derivative more tangible
+        # B:sqrt()
         B:tanh()
         B.unsqueeze_(0)
         return B
  
     @staticmethod
     def backward(ctx, grad_output):
-        # input, weight = ctx.saved_tensors
-        # return grad_output, None
         input, weight, output_features = ctx.saved_tensors
-        grad_input = grad_output.mm(weight)
-        # print('grad_output shape', grad_output.shape, 'weight shape', weight.shape)
         grad_weight = torch.zeros(weight.shape)
 
-        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
-        A:pow(2)
-        B = torch.sum(A, 1)
-        # print('weight shape', weight.shape, 'B.shape', B.shape) # expect to see a 20x250, 20x1 tensor
+        A = weight - torch.cat([input for __ in range(int(output_features))], 0)
+        B = torch.sum(torch.pow(A,2), 1)
         winner, c = B.min(0)
         if winner < 0.5: # TODO: make this an adjustable paramter sl later
             weight[c, :] = winner
             # TODO: generate a new dude but we're actually just going to do nothing for now
             # print('not really adding new block')
+
+        # based on math
+        chain_grad = -A
+        B.unsqueeze_(1)
+        tanh_grad = torch.cat([B for __ in range(input.size(1))], 1)
+        tanh_grad = 1-torch.pow(tanh_grad, 2)
+        grad_input = grad_output.mm(chain_grad*tanh_grad) # element multiplication
         return grad_input, grad_weight, None
 
 
@@ -98,10 +103,10 @@ class SoniaNet(nn.Module):
         self.fc2 = nn.Linear(20, 10)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(torch.tanh(self.conv1(x)))
+        x = self.pool(torch.tanh(self.conv2(x)))
         x = x.view(-1, 10 * 5 * 5)
-        x = F.relu(self.fc1(x))
+        x = self.fc1(x)
         x = self.fc2(x)
         return x
 cnn = SoniaNet()
@@ -111,7 +116,7 @@ import torch.optim as optim
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(cnn.parameters(), lr=0.001, momentum=0.9)
-for epoch in range(2):  # loop over the dataset multiple times
+for epoch in range(num_epochs):  # loop over the dataset multiple times
 
     running_loss = 0.0
     for i, data in enumerate(trainloader, 0):
