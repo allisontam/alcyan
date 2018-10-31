@@ -25,7 +25,7 @@ classes = ('plane', 'car', 'bird', 'cat',
 
 class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
     def __init__(self, input_features, output_features):
-        super(Linear, self).__init__()
+        super(SoniaLayer, self).__init__()
         self.input_features = input_features
         self.output_features = output_features
 
@@ -48,7 +48,7 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
 # SOM LAYER
 class SoniaFunc(torch.autograd.Function):
     def __init__(self):
-        super(Som, self).__init__()
+        super(SoniaFunc, self).__init__()
 
     @staticmethod
     def forward(ctx, input, weight, output_features):
