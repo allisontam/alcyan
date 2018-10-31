@@ -55,19 +55,22 @@ class SoniaFunc(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input, weight, output_features):
-        ctx.save_for_backward(input, weight)
-        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
+        ctx.save_for_backward(input, 
+                              weight, 
+                              torch.ones(1, dtype=torch.int, requires_grad=False) * output_features)
+        A = weight - torch.cat([input for __ in range(int(output_features))], 0)	# TODO check axis
         A:pow(2)
         B = torch.sum(A, 1)
         B:sqrt()
         B:tanh()
+        B.unsqueeze_(0)
         return B
  
     @staticmethod
     def backward(ctx, grad_output):
         # input, weight = ctx.saved_tensors
         # return grad_output, None
-        input, weight = ctx.saved_tensors
+        input, weight, output_features = ctx.saved_tensors
         grad_input = weight
         grad_weight = torch.zeros(weight.shape)
 
@@ -120,6 +123,8 @@ for epoch in range(2):  # loop over the dataset multiple times
 
         # forward + backward + optimize
         outputs = cnn(inputs)
+        print('OUTPUT SHAPE:', outputs)
+        print('LABEL SHAPE:', labels)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
