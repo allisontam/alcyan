@@ -25,9 +25,12 @@ classes = ('plane', 'car', 'bird', 'cat',
 
 class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
     def __init__(self, input_features, output_features):
-        super(Linear, self).__init__()
+        super(SoniaLayer, self).__init__()
         self.input_features = input_features
         self.output_features = output_features
+        # might need to make output_features a tensor with param requires_grad=False
+        # this^ is the case (i think) bc forward requires all its input params to be a tensor
+        # this might switch when we add hidden layers but we worry about it later
 
         self.weight = nn.Parameter(torch.Tensor(output_features, input_features))
 
@@ -62,14 +65,24 @@ class SoniaFunc(torch.autograd.Function):
  
     @staticmethod
     def backward(ctx, grad_output):
-        input, weight, bias = ctx.saved_tensors
-        return grad_output
         # input, weight = ctx.saved_tensors
-        # A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
-        # A:pow(2)
-        # B = torch.sum(A, 1)
-        # print B.shape
-        # winner, c = B.min(0)
+        # return grad_output, None
+        input, weight = ctx.saved_tensors
+        grad_input = weight
+        grad_weight = torch.zeros(weight.shape)
+
+        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
+        A:pow(2)
+        B = torch.sum(A, 1)
+        print('weight shape', weight.shape, 'B.shape', B.shape) # expect to see a 20x250, 20x1 tensor
+        winner, c = B.min(0)
+        if winner < 0.5: # TODO: make this an adjustable paramter sl later
+            weight[c, :] = winner
+        else:
+            # TODO: generate a new dude but we're actually just going to do nothing for now
+            print('not really adding new block')
+        return grad_input, grad_weight, None
+
 
 ### SECTION 2: BUILD NET
 class SoniaNet(nn.Module):
