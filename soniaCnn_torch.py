@@ -1,5 +1,7 @@
 ### SECTION 1: LOAD CIFAR
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 
@@ -63,12 +65,9 @@ class SoniaFunc(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         input, weight, bias = ctx.saved_tensors
-
+        return grad_output
 
 ### SECTION 2: BUILD NET
-import torch.nn as nn
-import torch.nn.functional as F
-
 class SoniaNet(nn.Module):
     def __init__(self):
         super(SoniaNet, self).__init__()
