@@ -1,7 +1,8 @@
 ### SECTION 0: HYPERPARAMETERS
-num_epochs = 1
+num_epochs = 5
 hidden_init = 2
 max_nodes = 20
+sl = 250 # stimulation level
 lr = 0.001
 
 ### SECTION 1: LOAD CIFAR
@@ -84,21 +85,21 @@ class SoniaFunc(torch.autograd.Function):
         winner, c = B[:int(hidden_num)].min(0)
 
         # need to be able to adjust lr bc gradient calcs and step happens separately
-        if winner < 0.5: # TODO: make this an adjustable paramter sl later
-            weight[c, :] = -winner/lr
+        if winner < sl:
+            grad_weight[c, :] = -winner/lr
         else:
-            if hidden_num < max_nodes: # TODO unmask new nodes
+            if hidden_num < max_nodes:
                 grad_hidden_num -= 1/lr
-
-        # print(hidden_num, grad_hidden_num)
-        # print(weight)
+                grad_weight[int(hidden_num),:] = -input/lr
 
         # based on math
         chain_grad = -A
         B.unsqueeze_(1)
         tanh_grad = torch.cat([B for __ in range(input.size(1))], 1)
-        tanh_grad = 1-torch.pow(tanh_grad, 2)
-        grad_input = grad_output.mm(chain_grad*tanh_grad) # element multiplication
+        tanh_grad = 1-tanh_grad.pow(2)
+        do_dx = chain_grad*tanh_grad
+        do_dx[int(hidden_num):, :] = 0 # don't want to affect masked convolution weights
+        grad_input = grad_output.mm(do_dx) # element multiplication
         return grad_input, grad_weight, grad_hidden_num
 
 
@@ -109,14 +110,14 @@ class SoniaNet(nn.Module):
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 10, 5)
-        self.fc1 = SoniaLayer(10 * 5 * 5, max_nodes) # input is flattened 10 5x5 filters
-        self.fc2 = nn.Linear(20, 10)
+        self.sonia = SoniaLayer(10 * 5 * 5, max_nodes) # input is flattened 10 5x5 filters
+        self.fc2 = nn.Linear(max_nodes, 10)
 
     def forward(self, x):
         x = self.pool(torch.tanh(self.conv1(x)))
         x = self.pool(torch.tanh(self.conv2(x)))
         x = x.view(-1, 10 * 5 * 5)
-        x = self.fc1(x)
+        x = self.sonia(x)
         x = self.fc2(x)
         return x
 cnn = SoniaNet()
@@ -139,8 +140,6 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
 
         # forward + backward + optimize
         outputs = cnn(inputs)
-        # print('OUTPUT SHAPE:', outputs)
-        # print('LABEL SHAPE:', labels)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -150,6 +149,7 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
         if i % 2000 == 1999:    # print every 2000 mini-batches
             print('[%d, %5d] loss: %.3f' %
                   (epoch + 1, i + 1, running_loss / 2000))
+            print('number of hidden units', cnn.sonia.hidden_num)
             running_loss = 0.0
 
 print('Finished Training')
