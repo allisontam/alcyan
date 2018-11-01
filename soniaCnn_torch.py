@@ -1,5 +1,8 @@
 ### SECTION 0: HYPERPARAMETERS
 num_epochs = 1
+hidden_init = 2
+max_nodes = 20
+lr = 0.001
 
 ### SECTION 1: LOAD CIFAR
 import torch
@@ -30,25 +33,25 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
     def __init__(self, input_features, output_features):
         super(SoniaLayer, self).__init__()
         self.input_features = input_features
-        self.output_features = torch.ones(1, dtype=torch.int, requires_grad=False)*output_features
-        # might need to make output_features a tensor with param requires_grad=False
-        # this^ is the case (i think) bc forward requires all its input params to be a tensor
-        # this might switch when we add hidden layers but we worry about it later
 
-        self.weight = nn.Parameter(torch.Tensor(output_features, input_features))
+        # cannot modify through gradient unless it's a float
+        self.hidden_num = nn.Parameter(torch.ones(1)*hidden_init)
 
-        # Not a very smart way to initialize weights
-        self.weight.data.uniform_(-0.1, 0.1)
+        # Initialize weights
+        weight = torch.Tensor(output_features, input_features)
+        weight.data.uniform_(-0.1, 0.1)
+        weight[hidden_init:,:] = 0
+        self.weight = nn.Parameter(weight)
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
-        return SoniaFunc.apply(input, self.weight, self.output_features)
+        return SoniaFunc.apply(input, self.weight, self.hidden_num)
 
     def extra_repr(self):
         # (Optional)Set the extra information about this module. You can test
         # it by printing an object of this class.
-        return 'in_features={}, out_features={}'.format(
-            self.in_features, self.out_features
+        return 'in_features={}, out_features={}, num_hidden_nodes={}'.format(
+            self.in_features, self.out_features, self.hidden_num
         )
 
 # SOM LAYER
@@ -57,11 +60,11 @@ class SoniaFunc(torch.autograd.Function):
         super(SoniaFunc, self).__init__()
 
     @staticmethod
-    def forward(ctx, input, weight, output_features):
+    def forward(ctx, input, weight, hidden_num):
         ctx.save_for_backward(input,
                               weight,
-                              output_features)
-        A = weight - torch.cat([input for __ in range(int(output_features))], 0) # TODO: check axis
+                              hidden_num)
+        A = weight - torch.cat([input for __ in range(weight.size(0))], 0) # TODO: check axis
         A:pow(2)
         B = torch.sum(A, 1)
         # taking this line out to make the derivative more tangible
@@ -72,16 +75,23 @@ class SoniaFunc(torch.autograd.Function):
  
     @staticmethod
     def backward(ctx, grad_output):
-        input, weight, output_features = ctx.saved_tensors
+        input, weight, hidden_num = ctx.saved_tensors
         grad_weight = torch.zeros(weight.shape)
+        grad_hidden_num = torch.zeros(1)
 
-        A = weight - torch.cat([input for __ in range(int(output_features))], 0)
+        A = weight - torch.cat([input for __ in range(weight.size(0))], 0)
         B = torch.sum(torch.pow(A,2), 1)
-        winner, c = B.min(0)
+        winner, c = B[:int(hidden_num)].min(0)
+
+        # need to be able to adjust lr bc gradient calcs and step happens separately
         if winner < 0.5: # TODO: make this an adjustable paramter sl later
-            weight[c, :] = winner
-            # TODO: generate a new dude but we're actually just going to do nothing for now
-            # print('not really adding new block')
+            weight[c, :] = -winner/lr
+        else:
+            if hidden_num < max_nodes: # TODO unmask new nodes
+                grad_hidden_num -= 1/lr
+
+        # print(hidden_num, grad_hidden_num)
+        # print(weight)
 
         # based on math
         chain_grad = -A
@@ -89,7 +99,7 @@ class SoniaFunc(torch.autograd.Function):
         tanh_grad = torch.cat([B for __ in range(input.size(1))], 1)
         tanh_grad = 1-torch.pow(tanh_grad, 2)
         grad_input = grad_output.mm(chain_grad*tanh_grad) # element multiplication
-        return grad_input, grad_weight, None
+        return grad_input, grad_weight, grad_hidden_num
 
 
 ### SECTION 2: BUILD NET
@@ -99,7 +109,7 @@ class SoniaNet(nn.Module):
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 10, 5)
-        self.fc1 = SoniaLayer(10 * 5 * 5, 20) # input is flattened 10 5x5 filters
+        self.fc1 = SoniaLayer(10 * 5 * 5, max_nodes) # input is flattened 10 5x5 filters
         self.fc2 = nn.Linear(20, 10)
 
     def forward(self, x):
@@ -115,7 +125,8 @@ cnn = SoniaNet()
 import torch.optim as optim
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(cnn.parameters(), lr=0.001, momentum=0.9)
+optimizer = optim.SGD(cnn.parameters(), lr=lr)
+#, momentum=0.9) potentially cannot use momentum because we need to control grad
 for epoch in range(num_epochs):  # loop over the dataset multiple times
 
     running_loss = 0.0
