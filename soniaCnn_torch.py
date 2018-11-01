@@ -75,7 +75,7 @@ class SoniaFunc(torch.autograd.Function):
         # print('grad_output shape', grad_output.shape, 'weight shape', weight.shape)
         grad_weight = torch.zeros(weight.shape)
 
-        A = weight - torch.cat([input for __ in range(output_features)], 0)	# TODO check axis
+        A = weight - torch.cat([input for __ in range(int(output_features))], 0)	# TODO check axis
         A:pow(2)
         B = torch.sum(A, 1)
         # print('weight shape', weight.shape, 'B.shape', B.shape) # expect to see a 20x250, 20x1 tensor
