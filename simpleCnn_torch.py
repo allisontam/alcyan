@@ -1,3 +1,8 @@
+### SECTION 0: HYPERPARAMETERS
+num_epochs = 5
+max_nodes = 20
+lr = 0.001
+
 ### SECTION 1: LOAD CIFAR
 import torch
 import torchvision
@@ -31,8 +36,8 @@ class Cnn(nn.Module):
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 10, 5)
-        self.fc1 = nn.Linear(10 * 5 * 5, 20) # input is flattened 10 5x5 filters
-        self.fc2 = nn.Linear(20, 10)
+        self.fc1 = nn.Linear(10 * 5 * 5, max_nodes) # input is flattened 10 5x5 filters
+        self.fc2 = nn.Linear(max_nodes, 10)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
@@ -47,8 +52,8 @@ cnn = Cnn()
 import torch.optim as optim
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(cnn.parameters(), lr=0.001, momentum=0.9)
-for epoch in range(2):  # loop over the dataset multiple times
+optimizer = optim.SGD(cnn.parameters(), lr=lr)
+for epoch in range(num_epochs):  # loop over the dataset multiple times
 
     running_loss = 0.0
     for i, data in enumerate(trainloader, 0):
