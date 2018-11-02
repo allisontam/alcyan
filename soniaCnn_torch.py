@@ -76,6 +76,16 @@ class SoniaFunc(torch.autograd.Function):
  
     @staticmethod
     def backward(ctx, grad_output):
+        '''
+        Three things you want to mask:
+        1. forward activations from masked nodes should be 0
+            Prevents FC layer weights from changing
+            Handled in SoniaNet initialization
+        2. weight matrices to masked node should be 0
+            Allows you do initialize correctly when you unmask
+        3. gradient that you give to conv layers should be 0
+            Prevents conv layer weights from changing
+        '''
         input, weight, hidden_num = ctx.saved_tensors
         grad_weight = torch.zeros(weight.shape)
         grad_hidden_num = torch.zeros(1)
@@ -85,6 +95,7 @@ class SoniaFunc(torch.autograd.Function):
         winner, c = B[:int(hidden_num)].min(0)
 
         # need to be able to adjust lr bc gradient calcs and step happens separately
+        # implicitly handles (2)
         if winner < sl:
             grad_weight[c, :] = -winner/lr
         else:
@@ -98,7 +109,7 @@ class SoniaFunc(torch.autograd.Function):
         tanh_grad = torch.cat([B for __ in range(input.size(1))], 1)
         tanh_grad = 1-tanh_grad.pow(2)
         do_dx = chain_grad*tanh_grad
-        do_dx[int(hidden_num):, :] = 0 # don't want to affect masked convolution weights
+        do_dx[int(hidden_num):, :] = 0 # don't want to affect masked convolution weights (3)
         grad_input = grad_output.mm(do_dx) # element multiplication
         return grad_input, grad_weight, grad_hidden_num
 
@@ -154,7 +165,9 @@ for epoch in range(num_epochs):  # loop over the dataset multiple times
 
 print('Finished Training')
 
-### SECTION 4: TEST NET
+### SECTION 5: ADD NODES + RETRAIN (3.3)
+
+### SECTION 6: TEST NET
 correct = 0
 total = 0
 with torch.no_grad():
