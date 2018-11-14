@@ -5,7 +5,7 @@ max_nodes = 20
 max_nodes_3 = max_nodes + 2 + 10
 sl = 250 # stimulation level
 lr = 0.001
-dl = 100	# distance level - 0 < dl < 1
+dl = 100 # distance level - 0 < dl < 1
 
 ### SECTION 1: LOAD CIFAR
 import torch
@@ -32,7 +32,7 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=1,
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
+class SoniaLayer(nn.Module):
     def __init__(self, input_features, output_features):
         super(SoniaLayer, self).__init__()
         self.input_features = input_features
@@ -44,10 +44,10 @@ class SoniaLayer(nn.Module): ## TEMPLATE FROM LINEAR
         weight = torch.Tensor(output_features, input_features)
         weight.data.uniform_(-0.1, 0.1)
         weight[hidden_init:,:] = 0
-        weight[max_nodes, :] = 0		# initialize the first two hidden units after construction based on 3.3
+        weight[max_nodes, :] = 0 # initialize the first two hidden units after construction based on 3.3
         weight[max_nodes + 1, :] = 1
-        weight[max_nodes + 2:, :] = 0	
-        self.weight = nn.Parameter(weight)        
+        weight[max_nodes + 2:, :] = 0
+        self.weight = nn.Parameter(weight)
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
@@ -116,10 +116,11 @@ class SoniaFunc(torch.autograd.Function):
             a = weight[j, :]
             b = weight[j + 1, :]
             d_ab = torch.sum(torch.pow(a - b, 2))
-            if d_ab > dl:		# if we haven't exceeded the number of allowed mutations
+            if d_ab > dl: # if we haven't exceeded the number of allowed mutations
                 for j in range(weight.size(0)):
-                    if (weight[j, :] == torch.zeros(1, weight.size(1))).byte().all().item():	# if we get to an all-zero row
-                        weight[j, :] = (torch.rand((1, weight.size(1))) * (a - b)) + b                    
+                    # if we get to an all-zero row
+                    if (weight[j, :] == torch.zeros(1, weight.size(1))).byte().all().item():
+                        weight[j, :] = (torch.rand((1, weight.size(1))) * (a - b)) + b
                         break
         print(weight)
 
