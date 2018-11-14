@@ -1,3 +1,4 @@
 *.swp
 data/
 .ipynb_checkpoints/
+immune_gan.py
