@@ -14,8 +14,11 @@ transform = transforms.Compose([transforms.Grayscale(),
                                 transforms.Normalize([0.5], [0.5])])
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=16, shuffle=True, num_workers=2)
+# trainloader = torch.utils.data.DataLoader(trainset, batch_size=16, shuffle=False, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(list(range(32))))
+
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 testloader = torch.utils.data.DataLoader(testset, batch_size=16, shuffle=False, num_workers=2) 
+# testloader = torch.utils.data.DataLoader(testset, batch_size=16, shuffle=False, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(list(range(32))))
 
 # MODEL PARAMS
 L = 10**-2
@@ -26,23 +29,26 @@ num_epochs = 5
 class PropertyNet(nn.Module):
     def __init__(self):
         super(PropertyNet, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3)	# TODO should this be 3, 32, 3 bc 3-channel images?
-        self.conv2 = nn.Conv2d(32, 32, 3)
-        self.conv3 = nn.Conv2d(32, 64, 3)
-        self.conv4 = nn.Conv2d(64, 64, 3)
+        self.conv1 = nn.Conv2d(1, 8, 3)	# TODO should this be 3, 32, 3 bc 3-channel images?
+        self.conv2 = nn.Conv2d(8, 8, 3)
+        self.conv3 = nn.Conv2d(8, 16, 3)
+        self.conv4 = nn.Conv2d(16, 16, 3)
         self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(1600, num_classes)
+        self.fc1 = nn.Linear(400, num_classes)
+        self.layers = nn.ModuleList([self.conv1, self.conv2, self.conv3, self.conv4, self.pool, self.fc1])
+        self.pool_output = torch.randn(0, 400)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = self.pool(F.relu(self.conv2(x)))
         x = F.relu(self.conv3(x))
         x = self.pool(F.relu(self.conv4(x)))
-        x = x.view(-1, 1600)
+        x = x.view(-1, 400)
+        self.pool_output = torch.cat([self.pool_output, x], 0)
+#         torch.save(self.pool_output, 'pool_output.dat') 
         x = self.fc1(x)
         return x
 property_net = PropertyNet()
-
 
 # TRAINING
 criterion = nn.CrossEntropyLoss()
@@ -62,6 +68,7 @@ for epoch in range(num_epochs):
             print('[%d, %5d] loss: %.3f' % (epoch, i + 1, running_loss / 200))
             running_loss = 0.0
 
+property_net.pool_output = torch.randn(0, 400)
 print('Finished training')
 
 
@@ -73,14 +80,16 @@ with torch.no_grad():
     for data in testloader:
         images, labels = data
         outputs = property_net(images)
+#         print(property_net.layers[4].output.shape)
         all_outputs = np.vstack([all_outputs, outputs]) if all_outputs.size else outputs        
         __, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
         i += 1
 
-print(all_outputs.shape)
-np.save('output_activations', all_outputs)
+# np.save('output_activations', all_outputs)
+print(property_net.pool_output.shape)
+torch.save(property_net.pool_output, 'all_pool_output.dat')
 
 print('Accuracy of network on 10000 test images: %d %%' % (100 * correct / total))
 
