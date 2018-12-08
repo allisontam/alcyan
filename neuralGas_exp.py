@@ -4,8 +4,7 @@ import torchvision.transforms as transforms
 import numpy as np
 
 ### HYPERPARAMETERS
-max_nodes = 30
-train_size = 9000
+max_nodes = 300
 params = kohonen.kohonen.GrowingGasParameters(dimension=400, shape=(max_nodes,), growth_interval=5)
 num_epochs = 5
 
@@ -14,20 +13,21 @@ num_classes = 10
 transform = transforms.Compose([transforms.Grayscale(),
                                 transforms.ToTensor(),
                                 transforms.Normalize([0.5], [0.5])])
+trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=False, num_workers=2)
+
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 testloader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=2)
-inputs = torch.load('all_pool_output.dat').numpy()
 
-truth = []
-for data in testloader:
-    truth.append(int(data[1]))
-
-# 10,000 x 401 array. 1st col is truth
+# creating training matrix
+inputs = torch.load('train_activations.dat').numpy()
+truth = [int(data[1]) for data in trainloader]
+# for data in trainloader:
+    # truth.append(int(data[1]))
+# 50,000 x 401 array. 1st col is truth
 data = np.hstack([np.array(truth).reshape(len(truth),1), inputs])
 np.random.shuffle(data)
-trainset = np.copy(data[:train_size,1:])
-testset = data[train_size:]
-
+trainset = np.copy(data[:,1:])
 
 ### TRAIN MODEL
 gas = kohonen.kohonen.GrowingGas(params) # initialization
@@ -35,14 +35,13 @@ for epoch in range(num_epochs):
     for cue in trainset:
         gas.learn(cue)
     np.random.shuffle(trainset)
-
-pickle.dump(gas, open('gas-30.pkl','wb'))
+# pickle.dump(gas, open('gas-30.pkl','wb'))
 
 ### TRANSFORM MODEL INTO CLASSIFIER
 # with open('gas.pkl','rb') as f:
     # gas = pickle.load(f)
 cluster_rep = defaultdict(list)
-for entry in data[:train_size]:
+for entry in data:
     truth = int(entry[0])
     cue = entry[1:]
     cluster_rep[gas.winner(cue)].append(truth)
@@ -51,9 +50,18 @@ for k in cluster_rep.keys():
     cluster_rep[k] = np.argmax(np.bincount(np.array(cluster_rep[k])))
 print('class represenation amongst nodes:', Counter(cluster_rep.values()))
 
+# load testing set
+inputs = torch.load('test_activations.dat').numpy()
+truth = [int(data[1]) for data in testloader]
+# 10,000 x 401 array. 1st col is truth
+data = np.hstack([np.array(truth).reshape(len(truth),1), inputs])
+print(data.shape,'should be 10000x401')
+# testset = np.copy(data[:,1:])
+
+### TEST MODEl
 correct, tot = 0,0
 wrong = []
-for entry in testset:
+for entry in data:
     truth = int(entry[0])
     winner = gas.winner(entry[1:])
     if cluster_rep[winner] == truth:
