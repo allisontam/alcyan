@@ -83,7 +83,8 @@ for epoch in range(num_epochs):
         if not i % 200:
             print('[%d, %5d] loss: %.3f' % (epoch, i + 1, running_loss / 200))
             running_loss = 0.0
-
+if property_net.mode == 3:
+    property_net.load_state_dict( torch.load('models/propCnn_rgb') )
 property_net.pool_output = torch.randn(0, 400)
 print('Finished training')
 
@@ -105,7 +106,7 @@ with torch.no_grad():
 
 # np.save('output_activations', all_outputs)
 print(property_net.pool_output.shape)
-torch.save(property_net.pool_output, 'all_pool_output_3.dat' if property_net.mode == 'RGB' else 'all_pool_output.dat')
+torch.save(property_net.pool_output, 'all_pool_output_3.dat' if property_net.mode == 3 else 'all_pool_output.dat')
 
 print('Accuracy of network on 10000 test images: %d %%' % (100 * correct / total))
 
