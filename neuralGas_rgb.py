@@ -5,9 +5,9 @@ import numpy as np
 
 ### HYPERPARAMETERS
 max_nodes = 300
-params = kohonen.kohonen.GrowingGasParameters(dimension=400, shape=(max_nodes,), \
-        growth_interval=30, max_connection_age=30)
-num_epochs = 2
+params = kohonen.kohonen.GrowingGasParameters(dimension=1200, shape=(max_nodes,), \
+        growth_interval=20, max_connection_age=20, rapid_expand=10)
+num_epochs = 1
 
 ### LOAD DATA
 num_classes = 10
@@ -21,7 +21,7 @@ testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True
 testloader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=2)
 
 # creating training matrix
-inputs = torch.load('train_activations.dat').numpy()
+inputs = torch.load('rgbData/all_pool_training_3.dat').detach().numpy() # train_actiations
 truth = [int(data[1]) for data in trainloader]
 # for data in trainloader:
     # truth.append(int(data[1]))
@@ -31,15 +31,12 @@ np.random.shuffle(data)
 trainset = np.copy(data[:,1:])
 
 ### TRAIN MODEL
-gas = kohonen.kohonen.ImmuneGas(params) # initialization
-np.random.seed()
+# gas = kohonen.kohonen.ImmuneGas(params) # initialization
+gas = kohonen.kohonen.GrowingGas(params) # initialization
 for epoch in range(num_epochs):
     for cue in trainset:
         gas.learn(cue)
-    print('finished with epoch', epoch)
-    print('after mass pruning', gas.mass_extinct(trainset))
     np.random.shuffle(trainset)
-
 # pickle.dump(gas, open('gas-30.pkl','wb'))
 
 ### TRANSFORM MODEL INTO CLASSIFIER
@@ -56,7 +53,7 @@ for k in cluster_rep.keys():
 print('class represenation amongst nodes:', Counter(cluster_rep.values()))
 
 # load testing set
-inputs = torch.load('test_activations.dat').numpy()
+inputs = torch.load('rgbData/all_pool_output_3.dat').detach().numpy() #testing_activations
 truth = [int(data[1]) for data in testloader]
 # 10,000 x 401 array. 1st col is truth
 data = np.hstack([np.array(truth).reshape(len(truth),1), inputs])
